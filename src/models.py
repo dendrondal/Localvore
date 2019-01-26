@@ -1,6 +1,5 @@
 from pymongo import MongoClient
-from scraper import get_seasonal_veggies
-from flask import g
+from src.scraper import get_seasonal_veggies
 from pathlib import Path
 from sqlite3 import Error
 import json, sqlite3
@@ -11,11 +10,19 @@ import pandas as pd
 STATE = 'tennessee'
 
 
-def recipe_collection():
+def recipe_collection(collection):
     client = MongoClient()
-    db = client.RECIPES
-    recipes = db.full_format_recipes
-    return recipes
+    if collection == 'BB':
+        db = client.BB
+        recipes = db.full_format_recipes
+        return recipes
+    elif collection == 'RECIPES':
+        db = client.RECIPES
+        recipes = db.full_format_recipes
+        return recipes
+    else:
+        print('Invalid collection name entered')
+        return None
 
 
 def backend_query(state=STATE):

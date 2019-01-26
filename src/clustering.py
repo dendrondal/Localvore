@@ -1,6 +1,6 @@
 import spacy
-import os, json, pickle, random
-from models import recipe_collection, backend_query, mock_query
+import os, json, pickle
+from src.models import recipe_collection, backend_query, mock_query
 from tqdm import tqdm
 from bson.binary import Binary
 from sklearn.neighbors import NearestNeighbors
