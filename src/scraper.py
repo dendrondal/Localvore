@@ -1,9 +1,13 @@
-from requests_html import HTMLSession
 from datetime import date
-import pymongo, sys
-from tqdm import tqdm
 from typing import List
+
+import pymongo
+import re
+import sys
 from loguru import logger
+from requests_html import HTMLSession
+from tqdm import tqdm
+
 logger.add(sys.stderr)
 
 
@@ -55,27 +59,53 @@ def create_post(r):
             'keywords': 'span.wprm-recipe-keyword',
             'cost': 'span.wprm-recipe-recipe_cost',
             'rating': 'div.wprm-recipe-rating-details',
-            'ingredients': 'span.wprm-recipe-ingredient-name'
             }
     post = dict()
     for key, val in zip(list(tags.keys()), list(tags.values())):
         try:
-            post[key] = [item.text for item in
-                         r.html.find()]
-        except IndexError as e:
-            print(e)
+            post[key] = r.html.find(val).text
+        except IndexError:
             pass
+    raw_ingredients = [item.text for item in
+                       r.html.find('span.wprm-recipe-ingredient-name')]
+    if len(raw_ingredients) == 0:
+        return None
+    else:
+        post['ingredients'] = strip_details(raw_ingredients)
+        return post
 
-    return post
+
+def strip_details(ingredients: List[str]):
+    no_parentheses = [re.sub(r'\([^()]*\)', '', string)
+                      for string in ingredients]
+    precomma = [re.findall(r'[^,]+', string)[0] for string in no_parentheses]
+    return precomma
 
 
-def bulk_write(mongo_path: str, recipe_list):
+def trim_ingredients(mongo_path: str):
+    """Removes everything after comma and in parentheses"""
+    client = pymongo.MongoClient(mongo_path)
+    db = client.RECIPES
+    col = db.BB
+    num_failures=0
+    for recipe in tqdm(col.find()):
+        try:
+            recipe['ingredients'] = strip_details(recipe['ingredients'])
+        except Exception as e:
+            print(e)
+            num_failures += 1
+            print(num_failures)
+            pass
+        col.save(recipe)
+
+
+def bulk_write(mongo_path: str):
     """Scrapes all recipes extracted from budget bytes, writes ingredients
     to new MongoDB collection"""
     client = pymongo.MongoClient(mongo_path)
     db = client.RECIPES
     col = db.BB
-    #recipe_list = get_all_bb_recipes()
+    recipe_list = get_all_bb_recipes()
     for recipe in tqdm(recipe_list):
         with HTMLSession() as sess:
             fmtd_recipe = recipe.lower().replace(" ", "-")
@@ -83,3 +113,7 @@ def bulk_write(mongo_path: str, recipe_list):
             post = create_post(r)
             if post is not None:
                 col.insert_one(post)
+
+
+if __name__ == '__main__':
+    bulk_write('mongodb://localhost:27017/')

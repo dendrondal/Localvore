@@ -1,10 +1,12 @@
-from pymongo import MongoClient
-from src.scraper import get_seasonal_veggies
+import json
+import sqlite3
 from pathlib import Path
 from sqlite3 import Error
-import json, sqlite3
-import pandas as pd
 
+import pandas as pd
+from pymongo import MongoClient
+
+from src.scraper import get_seasonal_veggies
 
 #Global variable here until google location services added.
 STATE = 'tennessee'
@@ -12,16 +14,16 @@ STATE = 'tennessee'
 
 def recipe_collection(collection):
     client = MongoClient()
-    if collection == 'BB':
-        db = client.BB
-        recipes = db.full_format_recipes
+    db = client.RECIPES
+    cols = ['budget_bytes', 'epicurious']
+    if collection == cols[0]:
+        recipes = db.BB
         return recipes
-    elif collection == 'RECIPES':
-        db = client.RECIPES
+    elif collection == cols[1]:
         recipes = db.full_format_recipes
         return recipes
     else:
-        print('Invalid collection name entered')
+        print(f'Invalid collection name entered. Collections include {cols}')
         return None
 
 

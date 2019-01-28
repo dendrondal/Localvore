@@ -1,18 +1,22 @@
+import json
+import os
+import pickle
+
 import spacy
-import os, json, pickle
-from src.models import recipe_collection, backend_query, mock_query
-from tqdm import tqdm
 from bson.binary import Binary
 from sklearn.neighbors import NearestNeighbors
+from tqdm import tqdm
+
+from src.models import recipe_collection, backend_query, mock_query
 
 
-def keyword_vectorization():
+def keyword_vectorization(collection):
     """Large write operation to mongodb. Adds average word vector to each
     document"""
     nlp = spacy.load('en_core_web_lg')
-    collection = recipe_collection()
+    collection = recipe_collection(collection)
     for recipe in tqdm(collection.find()):
-        ingredients = " ".join([item.lower() for item in recipe['categories']])
+        ingredients = " ".join([item.lower() for item in recipe['ingredients']])
         tokens = nlp(ingredients)
         recipe['vector'] = Binary(pickle.dumps(tokens.vector))
         collection.save(recipe)
