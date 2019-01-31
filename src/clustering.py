@@ -1,53 +1,38 @@
-import json
-import os
 import pickle
+from random import randint
+from typing import Dict
 
-import spacy
-from bson.binary import Binary
 from sklearn.neighbors import NearestNeighbors
-from tqdm import tqdm
 
-from src.models import recipe_collection, backend_query, mock_query
-
-
-def keyword_vectorization(collection):
-    """Large write operation to mongodb. Adds average word vector to each
-    document"""
-    nlp = spacy.load('en_core_web_lg')
-    collection = recipe_collection(collection)
-    for recipe in tqdm(collection.find()):
-        ingredients = " ".join([item.lower() for item in recipe['ingredients']])
-        tokens = nlp(ingredients)
-        recipe['vector'] = Binary(pickle.dumps(tokens.vector))
-        collection.save(recipe)
+from src.models import backend_query
 
 
-def create_samples(state):
+def create_samples(collection: str, state: str) -> Dict:
     """Creates dict of recipe names, along with their associated vectors.
     Goal is to feed this forward into NearestNeighbors algorithm"""
     result = dict()
-    cursor = backend_query(state)
+    cursor = backend_query(collection, state)
     cursor.rewind()
     for recipe in cursor:
         name = recipe['title']
         result[name] = pickle.loads(recipe['vector'])
+    assert len(result) > 0, 'No matching recipes'
     return result
 
 
-def clustering(state, n_neighbors=5):
-    sample = create_samples(state)
-    X = list(sample.values())
+def clustering(state, collections=['BB'], n_neighbors=5):
+    names, X = list(), list()
+    for collection in collections:
+        collection_dict = create_samples(collection, state)
+        key, val = collection_dict.keys(), collection_dict.values()
+        names.append(list(key))
+        X.append(list(val))
+    #names = [item for sublist in names for item in sublist]
+    #X = [item for sublist in X for item in sublist]
+    names = names[0]
+    X = X[0]
     neigh = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
     neigh.fit(X)
-    indices = neigh.kneighbors([X[4443]], return_distance=False)
-    names = list(sample.keys())
+    indices = neigh.kneighbors([X[randint(0, len(X))]], return_distance=False)
     return [names[index] for index in indices[0]]
 
-
-def load_json():
-    """Tests directory for  test json dump, creates one if there is none.
-    Likely a memory-intensive operation, so this function should not be called
-    in production, only in testing."""
-    if "test_query.json" not in os.listdir():
-        mock_query()
-    return json.load("test_query.json")

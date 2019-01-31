@@ -1,9 +1,9 @@
+import re
+import sys
 from datetime import date
 from typing import List
 
 import pymongo
-import re
-import sys
 from loguru import logger
 from requests_html import HTMLSession
 from tqdm import tqdm
@@ -24,7 +24,7 @@ def get_seasonal_veggies(state: str) -> List[str]:
     session = HTMLSession()
     r = session.get(f'http://www.seasonalfoodguide.org/{state}/{today}')
     r.html.render(wait=1, sleep=1)
-    veggies = [card.text.split('\n')[0]
+    veggies = [card.text.lower().split('\n')[0]
                for card in r.html.find('#col-veg-detail-card')]
     #The CSS selector above returns the individual cards, and the first item
     #is the card title, aka vegetable.
@@ -55,15 +55,18 @@ def get_all_bb_recipes() -> List[str]:
 
 @logger.catch()
 def create_post(r):
-    tags = {'title': 'h2.wprm-recipe-name',
-            'keywords': 'span.wprm-recipe-keyword',
+    """"Uses currently open Response object to test for existence of various CSS
+    tags. Returns dictionary for insertion into MongoDB, or None if the
+    ingredients field is blank."""
+    tags = {'title': 'h1.title',
             'cost': 'span.wprm-recipe-recipe_cost',
             'rating': 'div.wprm-recipe-rating-details',
+            'keywords': 'span.wprm-recipe-keyword'
             }
     post = dict()
     for key, val in zip(list(tags.keys()), list(tags.values())):
         try:
-            post[key] = r.html.find(val).text
+            post[key] = r.html.find(val)[0].text
         except IndexError:
             pass
     raw_ingredients = [item.text for item in
@@ -72,10 +75,15 @@ def create_post(r):
         return None
     else:
         post['ingredients'] = strip_details(raw_ingredients)
+        try:
+            post['keywords'] = post['keywords'].split(',')
+        except KeyError:
+            pass
         return post
 
 
 def strip_details(ingredients: List[str]):
+    """Removes everything in parentheses and after a comma in every string"""
     no_parentheses = [re.sub(r'\([^()]*\)', '', string)
                       for string in ingredients]
     precomma = [re.findall(r'[^,]+', string)[0] for string in no_parentheses]
@@ -115,5 +123,3 @@ def bulk_write(mongo_path: str):
                 col.insert_one(post)
 
 
-if __name__ == '__main__':
-    bulk_write('mongodb://localhost:27017/')
