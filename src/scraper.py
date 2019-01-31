@@ -1,14 +1,12 @@
-import re
-import sys
 from datetime import date
 from typing import List
 
-import pymongo
-from loguru import logger
+from pymongo import MongoClient
 from requests_html import HTMLSession
 from tqdm import tqdm
 
-logger.add(sys.stderr)
+from src import MONGOPATH
+from src.models import create_post
 
 
 def get_date() -> str:
@@ -53,64 +51,10 @@ def get_all_bb_recipes() -> List[str]:
     return recipe_list
 
 
-@logger.catch()
-def create_post(r):
-    """"Uses currently open Response object to test for existence of various CSS
-    tags. Returns dictionary for insertion into MongoDB, or None if the
-    ingredients field is blank."""
-    tags = {'title': 'h1.title',
-            'cost': 'span.wprm-recipe-recipe_cost',
-            'rating': 'div.wprm-recipe-rating-details',
-            'keywords': 'span.wprm-recipe-keyword'
-            }
-    post = dict()
-    for key, val in zip(list(tags.keys()), list(tags.values())):
-        try:
-            post[key] = r.html.find(val)[0].text
-        except IndexError:
-            pass
-    raw_ingredients = [item.text for item in
-                       r.html.find('span.wprm-recipe-ingredient-name')]
-    if len(raw_ingredients) == 0:
-        return None
-    else:
-        post['ingredients'] = strip_details(raw_ingredients)
-        try:
-            post['keywords'] = post['keywords'].split(',')
-        except KeyError:
-            pass
-        return post
-
-
-def strip_details(ingredients: List[str]):
-    """Removes everything in parentheses and after a comma in every string"""
-    no_parentheses = [re.sub(r'\([^()]*\)', '', string)
-                      for string in ingredients]
-    precomma = [re.findall(r'[^,]+', string)[0] for string in no_parentheses]
-    return precomma
-
-
-def trim_ingredients(mongo_path: str):
-    """Removes everything after comma and in parentheses"""
-    client = pymongo.MongoClient(mongo_path)
-    db = client.RECIPES
-    col = db.BB
-    num_failures=0
-    for recipe in tqdm(col.find()):
-        try:
-            recipe['ingredients'] = strip_details(recipe['ingredients'])
-        except Exception as e:
-            print(e)
-            num_failures += 1
-            print(num_failures)
-            pass
-        col.save(recipe)
-
-
-def bulk_write(mongo_path: str):
+def bulk_write(mongo_path=MONGOPATH):
     """Scrapes all recipes extracted from budget bytes, writes ingredients
     to new MongoDB collection"""
-    client = pymongo.MongoClient(mongo_path)
+    client = MongoClient(mongo_path)
     db = client.RECIPES
     col = db.BB
     recipe_list = get_all_bb_recipes()
@@ -121,5 +65,3 @@ def bulk_write(mongo_path: str):
             post = create_post(r)
             if post is not None:
                 col.insert_one(post)
-
-
