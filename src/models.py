@@ -64,7 +64,7 @@ def trim_ingredients(mongo_path=MONGOPATH):
 
 
 @logger.catch()
-def create_post(r):
+def make_post(r):
     """"Uses currently open Response object to test for existence of various CSS
     tags. Returns dictionary for insertion into MongoDB, or None if the
     ingredients field is blank."""

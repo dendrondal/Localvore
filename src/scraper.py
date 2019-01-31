@@ -6,7 +6,7 @@ from requests_html import HTMLSession
 from tqdm import tqdm
 
 from src import MONGOPATH
-from src.models import create_post
+from src import models
 
 
 def get_date() -> str:
@@ -62,6 +62,6 @@ def bulk_write(mongo_path=MONGOPATH):
         with HTMLSession() as sess:
             fmtd_recipe = recipe.lower().replace(" ", "-")
             r = sess.get(f'https://www.budgetbytes.com/{fmtd_recipe}')
-            post = create_post(r)
+            post = models.make_post(r)
             if post is not None:
                 col.insert_one(post)
