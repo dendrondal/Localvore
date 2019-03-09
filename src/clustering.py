@@ -36,3 +36,8 @@ def clustering(state, collections=['BB'], n_neighbors=5):
     indices = neigh.kneighbors([X[randint(0, len(X))]], return_distance=False)
     return [names[index] for index in indices[0]]
 
+
+def embedding_to_tsvs(collection: str):
+    '''Helper function to get all recipe names and recipe names from database
+    into two separate tsv files for analysis in tensorflow projector'''
+
