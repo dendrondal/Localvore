@@ -18,7 +18,7 @@ def read_mongo(collection, query={}, noid=True):
     return df
 
 
-def t_sne(df=read_mongo('BB')):
+def t_sne(df):
 
     X = df['vector'].values
     X_train = np.vstack(X)
@@ -30,8 +30,11 @@ def t_sne(df=read_mongo('BB')):
 
 def plot_tsne(df):
 
-    alt.Chart(df).mark_circle(size=60).encode(
-        x='tsne_dim1',
-        y='tsne_dim2',
-        tooltip=['title', 'keywords']
+    chart = alt.Chart(df).mark_circle(size=60).encode(
+        x='tsne_dim1:Q',
+        y='tsne_dim2:Q',
+        tooltip='title:N'
     ).interactive()
+
+    chart.serve()
+

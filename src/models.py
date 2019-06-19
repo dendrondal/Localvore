@@ -15,7 +15,7 @@ from src.scraper import get_seasonal_veggies
 logger.add(sys.stderr)
 
 
-def backend_query(collection, state=STATE, mongo_path=MONGOPATH):
+def backend_query(collection: str, state=STATE, mongo_path=MONGOPATH):
     """Pings API from seasonalfoodguide, scrapes html, and finds set union
     of veggies and recipe collection by keyword."""
     client = MongoClient(mongo_path)
@@ -47,7 +47,8 @@ def strip_details(ingredients: List[str]):
 
 
 def trim_ingredients(mongo_path=MONGOPATH):
-    """Removes everything after comma and in parentheses"""
+    """Removes everything after comma and in parentheses for
+    existing documents"""
     client = MongoClient(mongo_path)
     db = client.RECIPES
     col = db.BB

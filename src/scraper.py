@@ -10,6 +10,8 @@ from src import models
 
 
 def get_date() -> str:
+    """Gets date in format compatible with seasonalfoodguide urls,
+    i.e. early-january, late-may, etc."""
     month = date.today().strftime('%B').lower()
     period = 'early' if date.today().day <= 15 else 'late'
     return f'{period}-{month}'
@@ -50,6 +52,13 @@ def get_all_bb_recipes() -> List[str]:
         i += 1
     return recipe_list
 
+
+def usda_api():
+    """Gets food group data from USDA api"""
+
+
+def dedupe_perishables():
+    """Removes rep"""
 
 def bulk_write(mongo_path=MONGOPATH):
     """Scrapes all recipes extracted from budget bytes, writes ingredients

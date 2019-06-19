@@ -1,6 +1,6 @@
 import pickle
 from random import randint
-from typing import Dict
+from typing import List, Dict
 
 from sklearn.neighbors import NearestNeighbors
 
@@ -20,24 +20,17 @@ def create_samples(collection: str, state: str) -> Dict:
     return result
 
 
-def clustering(state, collections=['BB'], n_neighbors=5):
+def clustering(state, collections=['BB'], n_neighbors=5) -> List[Dict]:
     names, X = list(), list()
     for collection in collections:
         collection_dict = create_samples(collection, state)
         key, val = collection_dict.keys(), collection_dict.values()
         names.append(list(key))
         X.append(list(val))
-    #names = [item for sublist in names for item in sublist]
-    #X = [item for sublist in X for item in sublist]
     names = names[0]
     X = X[0]
     neigh = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
     neigh.fit(X)
     indices = neigh.kneighbors([X[randint(0, len(X))]], return_distance=False)
     return [names[index] for index in indices[0]]
-
-
-def embedding_to_tsvs(collection: str):
-    '''Helper function to get all recipe names and recipe names from database
-    into two separate tsv files for analysis in tensorflow projector'''
 
