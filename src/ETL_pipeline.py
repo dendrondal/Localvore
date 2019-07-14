@@ -10,6 +10,7 @@ import spacy
 from loguru import logger
 import sys
 import dask.dataframe as dd
+import numpy as np
 
 
 #Global variables for default filepaths/urls, can be altered via click
@@ -32,7 +33,7 @@ def mongo_init(mongopath):
 def insert_recipes(layer1_path, collection):
     """Chunks through json text of recipe dataset, writes id, name, and url
     to MongoDB. Due to large size of json (1.8gb on disk), data is instead
-    streamed using ijson, with checks for matching json keys at each point."""
+    streamed using ijson, with checks for matchingETL_pipeline import filter_predictions, garbage_collection json keys at each point."""
     entry = dict()
     for prefix, _, value in tqdm(ijson.parse(open(layer1_path))):
         if len(entry) == 3:
@@ -46,8 +47,8 @@ def insert_recipes(layer1_path, collection):
             entry['url'] = value
 
 
-def _compression(row):
-    return list(itertools.compress(row['raw_ingrs'], row['valid']))
+def _compression(ingrs, truths):
+    return list(itertools.compress(ingrs, truths))
 
 
 def _textract(row):
@@ -80,8 +81,9 @@ def filter_predictions(df):
     mongo.
     """
     tqdm.pandas(desc='Map/Reduce')
-    df['cleaned'] = df.progress_apply(lambda row: _compression(row), axis=1)
-    df['ingredients'] = df['cleaned'].progress_apply(_textract)
+    df['cleaned'] = df[['raw_ingrs', 'valid']].apply(lambda x: _compression(*x),
+                             axis=1)
+    #df['ingredients'] = df['cleaned'].apply(_textract)
     return df
 
 
