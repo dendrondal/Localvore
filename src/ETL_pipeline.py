@@ -1,17 +1,16 @@
-import pandas as pd
-import pickle
-from bson.binary import Binary
-from pymongo import MongoClient
-import click
 import itertools
-import ijson
-from tqdm import tqdm
-import spacy
-from loguru import logger
+import pickle
 import sys
-import dask.dataframe as dd
-import numpy as np
 
+import click
+import ijson
+import numpy as np
+import pandas as pd
+import spacy
+from bson.binary import Binary
+from loguru import logger
+from pymongo import MongoClient
+from tqdm import tqdm
 
 #Global variables for default filepaths/urls, can be altered via click
 MONGOPATH = 'mongodb://localhost:27017/'
@@ -48,16 +47,25 @@ def insert_recipes(layer1_path, collection):
 
 
 def _compression(ingrs, truths):
-    return list(itertools.compress(ingrs, truths))
+    """Helper function for filter_predictions"""
+    if not any(truths):
+        return np.NaN
+    else:
+        return list(itertools.compress(ingrs, truths))
 
 
 def _textract(row):
+    """Helper function for filter_predictions"""
     return [item['text'] for item in row]
 
 
-def load_layer1(data_url):
+def load_predictions(data_url):
+    """I/O function for filter_predictions"""
     df = pd.read_json(data_url)
-    df.columns = ['_id', 'raw_ingrs', 'valid']
+    df.rename(columns={'id': '_id',
+                       'ingredients': 'raw_ingrs',
+                       'valid': 'valid'},
+              inplace=True)
     return df
 
 
@@ -81,13 +89,11 @@ def filter_predictions(df):
     mongo.
     """
     tqdm.pandas(desc='Map/Reduce')
-    df['cleaned'] = df[['raw_ingrs', 'valid']].apply(lambda x: _compression(*x),
-                             axis=1)
-    #df['ingredients'] = df['cleaned'].apply(_textract)
-    return df
-
-
-def garbage_collection(df):
+    df['cleaned'] = df[['raw_ingrs', 'valid']].progress_apply(lambda x:
+                                                              _compression(*x),
+                                                              axis=1)
+    df.dropna(inplace=True)
+    df['ingredients'] = df['cleaned'].progress_apply(_textract)
     df.drop(['raw_ingrs', 'valid', 'cleaned'], axis=1)
     return df.to_dict()
 
@@ -118,7 +124,8 @@ def main(layer1, mongopath, prediction_url, vectorization):
     col = mongo_init(mongopath)
     if layer1:
         insert_recipes(layer1, col)
-    insert_results(prediction_url, col)
+    predictions = load_predictions(prediction_url)
+    insert_ingredients(filter_predictions(predictions), col)
     if vectorization:
         ingredient_vectorization(col)
 
