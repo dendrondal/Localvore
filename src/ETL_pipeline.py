@@ -16,6 +16,7 @@ from tqdm import tqdm
 MONGOPATH = 'mongodb://localhost:27017/'
 PATH_TO_LAYER1 = '/media/dal/Localvore Volume/layer1.json'
 PREDICTION_DATA = 'http://data.csail.mit.edu/im2recipe/det_ingrs.json'
+
 logger.add(sys.stderr, format="{level} {message}", level='INFO')
 
 
@@ -88,29 +89,37 @@ def filter_predictions(df):
     These are mapped by a "valid" array with boolean values, then written to
     mongo.
     """
-    tqdm.pandas(desc='Map/Reduce')
-    df['cleaned'] = df[['raw_ingrs', 'valid']].progress_apply(lambda x:
-                                                              _compression(*x),
-                                                              axis=1)
+    logger.info('Starting compression operation...')
+    df['cleaned'] = df[['raw_ingrs', 'valid']].apply(lambda x:
+                                                     _compression(*x),
+                                                     axis=1)
     df.dropna(inplace=True)
-    df['ingredients'] = df['cleaned'].progress_apply(_textract)
-    df.drop(['raw_ingrs', 'valid', 'cleaned'], axis=1)
-    return df.to_dict()
+    logger.info('Doing list comprehensions on cleaned df...')
+    df['ingredients'] = df['cleaned'].apply(_textract)
+    df.drop(['raw_ingrs', 'valid', 'cleaned'], axis=1, inplace=True)
+    logger.info('Cleaning done!')
+    return df
 
 
-def insert_ingredients(ingr_dict, collection):
-    collection.update_many(ingr_dict)
+def insert_ingredients(df, collection):
+    """Bulk write of filtered ingredient lists to MongoDB"""
+    logger.info('Starting bulk write to Mongo')
+    for row in tqdm(df.iterrows(index=False)):
+        collection.update_one({'_id': row[0]},
+                              {'$set': {'ingredients': row[1]}})
 
 
 def ingredient_vectorization(collection):
     """Performs word2vec on all ingredients in each recipe, pickles average
     vector of each recipe"""
     nlp = spacy.load('en_core_web_lg')
+    logger.info('Starting word2vec')
     for recipe in tqdm(collection.find({})):
         ingredients = " ".join([item.lower() for item in recipe['ingredients']])
         tokens = nlp(ingredients)
         recipe['vector'] = Binary(pickle.dumps(tokens.vector))
         collection.update_one(recipe)
+    logger.info('Mongo collection is up to date!')
 
 
 @click.command()

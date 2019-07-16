@@ -64,5 +64,7 @@ def test_textract(lists):
 def test_filter_predictions(mock_df):
     assume(len(mock_df.columns) == 3)
     assume(len(mock_df) != 0)
-    data_dict = ETL_pipeline.filter_predictions(mock_df)
-    assert len(data_dict['ingredients']) > 0
+    df = ETL_pipeline.filter_predictions(mock_df)
+    assume(len(df) > 0)
+    assert len(df.columns) == 2
+    assert len(df['ingredients']) > 0
