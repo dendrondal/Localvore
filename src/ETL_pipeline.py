@@ -9,7 +9,7 @@ import pandas as pd
 import spacy
 from bson.binary import Binary
 from loguru import logger
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
 from tqdm import tqdm
 
 #Global variables for default filepaths/urls, can be altered via click
@@ -104,7 +104,7 @@ def filter_predictions(df):
 def insert_ingredients(df, collection):
     """Bulk write of filtered ingredient lists to MongoDB"""
     logger.info('Starting bulk write to Mongo')
-    for row in tqdm(df.iterrows(index=False)):
+    for row in tqdm(df.itertuples(index=False)):
         collection.update_one({'_id': row[0]},
                               {'$set': {'ingredients': row[1]}})
 
@@ -114,18 +114,22 @@ def ingredient_vectorization(collection):
     vector of each recipe"""
     nlp = spacy.load('en_core_web_lg')
     logger.info('Starting word2vec')
-    for recipe in tqdm(collection.find({})):
-        ingredients = " ".join([item.lower() for item in recipe['ingredients']])
+    for recipe in tqdm(collection.find({}, no_cursor_timeout=True)):
+        try:
+            ingredients = " ".join([item.lower() for item in recipe['ingredients']])
+        except (KeyError, errors.CursorNotFound) as e:
+            logger.warning(f'Caught exception {e}')
+            pass
         tokens = nlp(ingredients)
-        recipe['vector'] = Binary(pickle.dumps(tokens.vector))
-        collection.update_one(recipe)
+        vector = Binary(pickle.dumps(tokens.vector))
+        collection.update_one(recipe, {'$set': {'vector': vector}})
     logger.info('Mongo collection is up to date!')
 
 
 @click.command()
 @click.option('--layer1', default=False, help='Layer1 json filepath')
 @click.option('--mongopath', default=MONGOPATH, help='MongoDB url')
-@click.option('--prediction_url', default=PREDICTION_DATA,
+@click.option('--prediction_url', default=False,
               help='URL to LSTM predictions')
 @click.option('--vectorization', default=True,
               help='Whether to calculate recipe vectors (time intensive!)')
@@ -133,11 +137,11 @@ def main(layer1, mongopath, prediction_url, vectorization):
     col = mongo_init(mongopath)
     if layer1:
         insert_recipes(layer1, col)
-    predictions = load_predictions(prediction_url)
-    insert_ingredients(filter_predictions(predictions), col)
+    if prediction_url:
+        predictions = load_predictions(prediction_url)
+        insert_ingredients(filter_predictions(predictions), col)
     if vectorization:
         ingredient_vectorization(col)
-
 
 if __name__ == '__main__':
     main()
