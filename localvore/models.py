@@ -9,8 +9,9 @@ from loguru import logger
 from pymongo import MongoClient
 from tqdm import tqdm
 
-from src import MONGOPATH, STATE
-from src.scraper import get_seasonal_veggies
+MONGOPATH = 'mongodb://localhost:27017/'
+STATE = 'tennessee'
+from localvore.scraper import get_seasonal_veggies
 
 logger.add(sys.stderr)
 

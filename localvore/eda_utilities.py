@@ -4,7 +4,7 @@ import altair as alt
 import pickle
 import numpy as np
 from pymongo import MongoClient
-from src import MONGOPATH
+MONGOPATH = 'mongodb://localhost:27017/'
 
 
 def read_mongo(collection, query={}, noid=True):

@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.extra.pandas import column, data_frames
 
-from src import ETL_pipeline
+from localvore import ETL_pipeline
 
 
 @st.composite

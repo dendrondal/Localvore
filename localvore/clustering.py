@@ -5,7 +5,7 @@ from typing import List, Dict
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import DBSCAN, OPTICS
 
-from src.models import backend_query
+from localvore import backend_query
 
 
 def create_samples(collection: str, state: str) -> Dict:
@@ -45,6 +45,3 @@ def dbscan(state, collection='recipe1M', epsilon=0.5) -> List[Dict]:
     neigh = OPTICS(cluster_method='dbscan', n_jobs=-1)
     neigh.fit(X)
     print(f'No. of clusters: {len(neigh.labels_)}')
-
-
-dbscan('tennessee')

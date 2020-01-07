@@ -5,8 +5,8 @@ from pymongo import MongoClient
 from requests_html import HTMLSession
 from tqdm import tqdm
 
-from src import MONGOPATH
-from src import models
+from localvore import MONGOPATH
+from localvore import models
 
 
 def get_date() -> str:

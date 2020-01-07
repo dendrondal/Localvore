@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-from src.clustering import clustering
+from .clustering import clustering
 
 
 app = Flask(__name__)
