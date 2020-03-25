@@ -2,6 +2,7 @@ import pickle
 import re
 import sys
 from typing import List
+from threading import Thread
 
 import spacy
 from bson.binary import Binary
@@ -11,7 +12,7 @@ from tqdm import tqdm
 
 MONGOPATH = 'mongodb://localhost:27017/'
 STATE = 'tennessee'
-from localvore.scraper import get_seasonal_veggies
+from scraper import get_seasonal_veggies
 
 logger.add(sys.stderr)
 

@@ -4,6 +4,10 @@ import altair as alt
 import pickle
 import numpy as np
 from pymongo import MongoClient
+import matplotlib.pyplot as plt
+
+
+from clustering import dbscan
 MONGOPATH = 'mongodb://localhost:27017/'
 
 
@@ -38,3 +42,6 @@ def plot_tsne(df):
 
     chart.serve()
 
+
+def plot_dbscan(state)
+    clusters = dbscan(state)

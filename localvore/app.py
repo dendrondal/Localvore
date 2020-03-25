@@ -1,6 +1,6 @@
 from flask import Flask, jsonify
-from .clustering import clustering
-
+from clustering import clustering
+from threading import Thread
 
 app = Flask(__name__)
 
@@ -24,4 +24,5 @@ def create_app(config=None):
 
 
 if __name__ == '__main__':
+
     app.run(debug=True)

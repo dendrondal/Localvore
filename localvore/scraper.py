@@ -5,8 +5,8 @@ from pymongo import MongoClient
 from requests_html import HTMLSession
 from tqdm import tqdm
 
-from localvore import MONGOPATH
-from localvore import models
+import models
+MONGOPATH = 'mongodb://localhost:27017/'
 
 
 def get_date() -> str:
@@ -51,14 +51,6 @@ def get_all_bb_recipes() -> List[str]:
         sess.close()
         i += 1
     return recipe_list
-
-
-def usda_api():
-    """Gets food group data from USDA api"""
-
-
-def dedupe_perishables():
-    """Removes rep"""
 
 def bulk_write(mongo_path=MONGOPATH):
     """Scrapes all recipes extracted from budget bytes, writes ingredients

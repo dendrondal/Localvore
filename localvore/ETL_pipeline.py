@@ -33,7 +33,7 @@ def mongo_init(mongopath):
 def insert_recipes(layer1_path, collection):
     """Chunks through json text of recipe dataset, writes id, name, and url
     to MongoDB. Due to large size of json (1.8gb on disk), data is instead
-    streamed using ijson, with checks for matchingETL_pipeline import filter_predictions, garbage_collection json keys at each point."""
+    streamed using ijson, with checks for matching json keys at each point."""
     entry = dict()
     for prefix, _, value in tqdm(ijson.parse(open(layer1_path))):
         if len(entry) == 3:
