@@ -5,6 +5,8 @@ from datetime import date
 from pathlib import Path
 from typing import Dict, List
 
+from aiohttp import ClientSession
+from bs4 import BeautifulSoup
 from loguru import logger
 from pymongo import MongoClient
 from requests_html import AsyncHTMLSession, HTMLSession
@@ -75,44 +77,48 @@ class RecipeScraper:
     """
     def __init__(self, tags: Dict[str, str], collection_name: str, save=True, mongo_path=MONGOPATH):
         self.tags = tags
+        self.col_name = collection_name
         self.save = save
         self.mongo_path = mongo_path
-        self.col_name = collection_name
-        self.sess = AsyncHTMLSession()
         logger.add(sys.stderr)
 
     async def get_page_content(self, url):
         recipe_list = []
-        r = await self.sess.get(url, stream=True)
-        await r.html.arender(timeout=16, wait=4, sleep=1, keep_page=True)
-        print(f"Got recipes from {url.split('/')[-1]}")
-        for recipe in r.html.absolute_links:
-            recipe_list.append(recipe)
-        return [l for l in recipe_list if self.tags['root_url'] in l]
-            
+        async with ClientSession() as sess:
+            async with sess.get(url) as r:
+                html = await r.read()
+                print(f"Got recipes from {url.split('/')[-1]}")
+                soup = BeautifulSoup(html)
+                for recipe in soup.find_all('a', 'entry-title-link'):
+                    recipe_list.append(recipe.get('href'))
+        return recipe_list
+
     async def get_recipes(self, page_url):
-        r = await self.sess.get(page_url)
-        print(f'Fetching {page_url}')
-        await r.html.arender(timeout=60, wait=1, sleep=1) 
-        post = self.make_post(r)
-        if post is not None:
-            print(f"Got recipe for {post['title']}")
-            if self.save:
-                self.save_to_disk(post['title'], post)
+        async with ClientSession() as sess:
+            async with sess.get(page_url) as r:
+                html = await r.read()
+                post = self.make_post(html)
+                if post is not None:
+                    print(f"Got recipe for {post['title']}")
+                    if self.save:
+                        self.save_to_disk(post['title'], post)
 
     async def bulk_write(self, base_url):
         """Scrapes all recipes extracted from budget bytes, writes ingredients
         to new MongoDB collection"""
-        print(f'Getting content for {base_url}')
         content = await self.get_page_content(base_url) 
-        task_list = [self.get_recipes(recipe) for recipe in content]
-        await asyncio.gather(*task_list)
+        task_list = [asyncio.create_task(self.get_recipes(recipe)) for recipe in content]
+        sem = asyncio.Semaphore(10)
+        async with sem:
+            await asyncio.gather(*task_list)
 
     async def _main(self):
-        urls = [f"{self.tags['root_url']}/page/{i}" for i in
+        urls = [f"{self.tags['root_url']}/recipes/page/{i}" for i in
                      range(1, self.tags['pagination']+1)]
-        task_list = [self.bulk_write(url) for url in urls]
-        await asyncio.gather(*task_list)
+        sem = asyncio.Semaphore(10)
+        task_list = [asyncio.create_task(self.bulk_write(url)) for url in urls]
+        async with sem:
+            await asyncio.gather(*task_list)
 
     @staticmethod
     def strip_details(ingredients: List[str]):
@@ -127,22 +133,22 @@ class RecipeScraper:
         tags. Returns dictionary for insertion into MongoDB, or None if the
         ingredients field is blank."""
         post = dict()
+        soup = BeautifulSoup(r)
         for key, val in zip(list(self.tags.keys())[3:],
                             list(self.tags.values())[3:]):
-            print(f"Finding {key}")
             try:
-                post[key] = r.html.find(val)[0].text
-            except IndexError:
+                post[key] = soup.find(val.split('.')).string
+            except AttributeError:
                 pass
-        raw_ingredients = [item.html for item in
-                           r.html.find(self.tags['full_recipe'])]
+        raw_ingredients = soup.find(self.tags['full_recipe'].split('.'))
         if len(raw_ingredients) == 0:
             return None
         else:
-            post['ingredients'] = raw_ingredients[0]
+            post['ingredients'] = raw_ingredients
             try:
                 post['keywords'] = post['keywords'].split(',')
-            except KeyError:
+            except Exception as e:
+                logger.catch(e)
                 pass
             return post
 
@@ -150,15 +156,14 @@ class RecipeScraper:
         Path(Path.cwd() / self.col_name).mkdir(parents=True,
                                                       exist_ok=True)
         path = Path(Path.cwd() / self.col_name)
-        with open(path / f"{recipe_title.lower().replace(' ', '-')}.html", 'w+') as f:
-           f.write(f'<h1>{recipe_title}</h1>')
-           f.write(post['ingredients']) 
-
+        output = path / f"{recipe_title.lower().replace(' ', '-')}.html"
+        output.write_text(post['ingredients'].decode())
 
     def scrape(self):
         loop = asyncio.get_event_loop()
-        loop.create_task(self._main())
+        loop.run_until_complete(self._main())
         loop.close()
+
 
 ella_tags = {
     'root_url': 'https://naturallyella.com',
@@ -173,4 +178,4 @@ ella_tags = {
     'keywords': 'em'
 }
 
-#RecipeScraper(ella_tags, 'ella').scrape()
+RecipeScraper(ella_tags, 'ella').scrape()

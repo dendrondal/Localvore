@@ -2,12 +2,12 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from requests_html import AsyncHTMLSession
+from aiohttp import ClientSession
 
 from localvore.scraper import RecipeScraper
 
 mock_tags = {
-    'root_url': 'http://naturallyella.com',
+    'root_url': 'https://naturallyella.com',
     'pagination': 2,
     'nav_title': 'h2.entry-title',
     'title': 'h1.entry-title',
@@ -36,12 +36,20 @@ async def test_get_recipes():
 
 @pytest.mark.asyncio
 async def test_post():
-    sess = AsyncHTMLSession()
-    r = await sess.get(mock_url)
-    await r.html.arender(timeout=60, wait=1, sleep=1, keep_page=True)
-    post = mock_object.make_post(r)
-    assert type(post) == dict
-    assert post['ingredients'] is not None
+    async with ClientSession() as sess:
+        async with sess.get(mock_url) as r:
+            html = await r.read()
+            post = mock_object.make_post(html)
+            assert type(post) == dict
+            assert post['ingredients'] is not None
+
+
+@pytest.mark.asyncio
+async def test_get_page_content():
+    url = mock_tags['root_url'] + '/recipes/page/1/'
+    result = await mock_object.get_page_content(url)
+    assert len(result) == 18
+    assert mock_tags['root_url'] in result[0]
 
 def test_scrape():
     mock_object.scrape()
